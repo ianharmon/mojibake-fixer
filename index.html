@@ -88,7 +88,7 @@ function fixMojibake(input) {
 <hr>
 <h2>How does it work?</h2>
 <p>The issue is surprisingly straightforward. The affected ZIP files were created with the <a href="https://en.wikipedia.org/wiki/Shift_JIS" target="_blank">Shift JIS encoding</a> but without specifying so in the ZIP file. With the Javascript libraries <a href="https://stuk.github.io/jszip/" target="_blank">JSZip</a> and <a href="https://github.com/SheetJS/js-codepage" target="_blank">js-codepage</a> doing the heavy lifting, this page opens the ZIP file, manually specifying Shift JIS as the encoding, and then saves a new copy of the ZIP, this time properly saving in Unicode so that it can be read on any PC.</p>
-<p><a href="http://ianharmon.com/">← back to my site</a></p>
+<!--<p><a href="http://ianharmon.com/">← back to my site</a></p>-->
 </section>
 
 <script>
