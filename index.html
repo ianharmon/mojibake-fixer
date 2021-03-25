@@ -7,6 +7,9 @@
 
 # Changelog
 
+## 2021-03-24
+ - using built-in TextDecoder and other newer browser features
+
 ## 2018-01-31
  - added explanation with credits, link back to site
 
@@ -22,52 +25,63 @@
 -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-p, hr { max-width: 500px; }
+p, hr { max-width: 600px; }
 hr { margin: 0; }
-.box { border: 1px solid #999; background: #f2f2f2; padding: 10px; }
 #uploadarea { margin: 50px 0; }
+#upload { border: 1px solid #999; background: #f2f2f2; padding: 10px; }
 </style>
-<script src="lib/js-codepage.js"></script>
 <script src="lib/jszip.min.js"></script>
-<script src="lib/FileSaver.min.js"></script>
+<script src="lib/FileSaver.js"></script>
 <script>
-function handleFiles(f) {
-  f = f[0];
-  JSZip.loadAsync(f, {
-    // https://github.com/Stuk/jszip/issues/384
-    decodeFileName: function(bytes) {
-      return cptable.utils.decode(932, bytes);
+async function handleFilesAsync(files) {
+  try {
+    // decode the file
+    const inputFile = files[0];
+    console.debug(`${inputFile.name}:`);
+    const decoder = new TextDecoder('shift-jis');
+    let zip;
+    try {
+      zip = await JSZip.loadAsync(inputFile, {
+        // https://stuk.github.io/jszip/documentation/api_jszip/load_async.html#decodefilename-option
+        decodeFileName: (bytes) => decoder.decode(bytes)
+      });
     }
-  }).then(function(zip) {
-      zip.forEach(function (relativePath, zipEntry) {
-          console.log(zipEntry.name);
-      });
-      zip.generateAsync({type:"blob"}).then(function (blob) {
-        var oldName = f.name;
-        var newName = oldName.replace(".zip", "-fixed.zip")
-        saveAs(blob, newName);
-        
-        var li = document.createElement("li");
-        li.innerText = "converted " + oldName + " to " + newName;
-        document.getElementById("converted").appendChild(li);
-      }, function (saveError) {
-        console.log(saveError);
-        alert("Something went wrong, details are in the console.");
-      });
-  }, function (loadError) {
-    console.log(loadError);
-    alert("Something went wrong, details are in the console. Please double-check that you selected a ZIP file.");
-  });
+    catch (e) {
+      console.error(e);
+      alert("Something went wrong while decoding the file, details are in the console.\nPlease double-check that you selected a ZIP file.");
+      return;
+    }
+    
+    // resave it
+    const newName = inputFile.name.replace(".zip", "-fixed.zip");
+    try {
+      const blob = await zip.generateAsync({type: "blob"});
+      saveAs(blob, newName);
+    }
+    catch (e) {
+      console.error(e);
+      alert("Something went wrong while saving, details are in the console.");
+      return;
+    }
+    
+    // add it to the converted list
+    const li = document.createElement("li");
+    li.innerText = `converted ${inputFile.name} to ${newName}`;
+    document.getElementById("converted").appendChild(li);
+    
+    // log filenames and alert if any (partially) failed
+    const filenames = Object.values(zip.files).map(x => x.name);
+    filenames.forEach(x => console.debug(`    ${x}`));
+    const anyFilenamesFailed = filenames.some(x => x.includes("�"));
+    if (anyFilenamesFailed) {
+      alert("Some filenames didn't convert properly.\nThe ZIP may not have been encoded in Shift JIS, or may be using an unsupported extension like Shift_JIS-2004.");
+    }
+  }
+  catch (e) {
+    console.error(e);
+    alert("Something went wrong, details are in the console.");
+  }
 }
-/*
-var broken = "é╨é╞é▌.png";
-console.log(fixMojibake(broken));
-//console.log(iconv.decode(iconv.encode(broken, 'cp437'), "shift-jis"));
-
-function fixMojibake(input) {
-  return cptable.utils.decode(932, cptable.utils.encode(437, input));
-}
-*/
 </script>
 </head>
 <body>
@@ -76,18 +90,20 @@ function fixMojibake(input) {
 <p>This page fixes ZIP archives containing files with Japanese filenames that weren't encoded with Unicode, that become <a href="https://en.wikipedia.org/wiki/Mojibake" target="_blank"><em>Mojibake</em></a> when extracted.</p>
 <p>e.g. what was originally called "ひとみ.png" ended up on your PC as "é╨é╞é▌.png"</p>
 <p>While you can set your PC to use a Japanese locale or use an archiver that supports the Japanese encoding, this page allows you to simply select one of these ZIP files with the file picker below and get a fixed version instantly.</p>
-<p>The conversion is done entirely in your browser, so your files are not sent to any server and remain private. Other types of archives and mojibake are not supported.</p>
+<p>The conversion is done entirely in your browser, so your files are not sent to any server and remain private.</p>
+<p>Passworded ZIPs and other types of archives or mojibake are not supported. Internet Explorer and the old version of Edge are also not supported.</p>
+<p>If this tool seems to have broken, <a href="https://github.com/ianharmon/mojibake-fixer/issues" target="_blank">let me know on GitHub</a>.</p>
 <hr>
 </section>
 <section id="uploadarea">
 <p>Open your ZIP file here:</p>
-<input class="box" id="upload" type="file" accept=".zip,application/zip,application/x-zip,application/x-zip-compressed" onchange="handleFiles(this.files)">
+<input id="upload" type="file" accept=".zip,application/zip,application/x-zip,application/x-zip-compressed" onchange="handleFilesAsync(this.files)">
 <ul id="converted"></ul>
 </section>
 <section id="explanation">
 <hr>
 <h2>How does it work?</h2>
-<p>The issue is surprisingly straightforward. The affected ZIP files were created with the <a href="https://en.wikipedia.org/wiki/Shift_JIS" target="_blank">Shift JIS encoding</a> but without specifying so in the ZIP file. With the Javascript libraries <a href="https://stuk.github.io/jszip/" target="_blank">JSZip</a> and <a href="https://github.com/SheetJS/js-codepage" target="_blank">js-codepage</a> doing the heavy lifting, this page opens the ZIP file, manually specifying Shift JIS as the encoding, and then saves a new copy of the ZIP, this time properly saving in Unicode so that it can be read on any PC.</p>
+<p>The issue is surprisingly straightforward. The affected ZIP files were created with the <a href="https://en.wikipedia.org/wiki/Shift_JIS" target="_blank">Shift JIS encoding</a> but without specifying so in the ZIP file. With <a href="https://stuk.github.io/jszip/" target="_blank">JSZip</a> and <a href="https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder/TextDecoder" target="_blank">TextDecoder</a> doing the heavy lifting, this page opens the ZIP file, manually specifying Shift JIS as the encoding, and then saves a new copy of the ZIP, this time properly saving in Unicode so that it can be read on any PC.</p>
 <!--<p><a href="http://ianharmon.com/">← back to my site</a></p>-->
 </section>
 
