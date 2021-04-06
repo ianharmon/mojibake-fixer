@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZIP Raw Filename Extractor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+p, hr { max-width: 600px; }
+hr { margin: 0; }
+#uploadarea { margin: 50px 0; }
+#upload { border: 1px solid #999; background: #f2f2f2; padding: 10px; }
+</style>
+<script src="lib/jszip.min.js"></script>
+<script src="lib/FileSaver.js"></script>
+<script>
+async function handleFilesAsync(files) {
+  try {
+    const inputFile = files[0];
+    const raws = [];
+    const zip = await JSZip.loadAsync(inputFile, {
+      decodeFileName: (bytes) => {
+        if (bytes.length > 0) {
+          raws.push(Array.from(bytes));
+        }
+        return bytes;
+      }
+    });
+    prompt("Paste this into the GitHub issue", JSON.stringify(raws));
+  }
+  catch (e) {
+    console.error(e);
+    alert("Something went wrong, details are in the console.");
+  }
+}
+</script>
+</head>
+<body>
+<section>
+<h1>ZIP Raw Filename Extractor</h1>
+<p>This tool will extract the raw bytes from the filenames of the selected ZIP without including any of the file data.</p>
+<hr>
+</section>
+<section id="uploadarea">
+<p>Open your ZIP file here:</p>
+<input id="upload" type="file" accept=".zip,application/zip,application/x-zip,application/x-zip-compressed" onchange="handleFilesAsync(this.files)">
+</section>
+</body>
+</html>
